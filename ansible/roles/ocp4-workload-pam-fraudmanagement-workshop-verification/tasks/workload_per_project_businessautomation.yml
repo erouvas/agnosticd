@@ -3,9 +3,13 @@
   command: >
     oc rollout status DeploymentConfig/rhpam-authoring-rhpamcentr --watch=true -n "{{ _namespace }}"
 
-- name: Check KieServer is running
+- name: Check KieServer for Case is running
   command: >
-    oc rollout status DeploymentConfig/rhpam-authoring-kieserver --watch=true -n "{{ _namespace }}"
+    oc rollout status DeploymentConfig/rhpam-authoring-kie-case --watch=true -n "{{ _namespace }}"
+
+- name: Check KieServer for DMN is running
+  command: >
+    oc rollout status DeploymentConfig/rhpam-authoring-kie-dmn --watch=true -n "{{ _namespace }}"
 
 - name: Get Business Central route host
   command: >
@@ -15,13 +19,21 @@
   delay: "{{ _delay }}"
   until: businesscentral_host.stdout != ""
 
-- name: Get Business Central route host
+- name: Get KieServer for Case route host
   command: >
-    oc get route/rhpam-authoring-kieserver -o jsonpath='{.spec.host}' -n "{{ _namespace }}"
-  register: kieserver_host
+    oc get route/rhpam-authoring-kie-case -o jsonpath='{.spec.host}' -n "{{ _namespace }}"
+  register: kieserver_case_host
   retries: "{{ _retry }}"
   delay: "{{ _delay }}"
-  until: kieserver_host.stdout != ""
+  until: kieserver_case_host.stdout != ""
+
+- name: Get KieServer for DMN route host
+  command: >
+    oc get route/rhpam-authoring-kie-dmn -o jsonpath='{.spec.host}' -n "{{ _namespace }}"
+  register: kieserver_dmn_host
+  retries: "{{ _retry }}"
+  delay: "{{ _delay }}"
+  until: kieserver_dmn_host.stdout != ""
 
 - name: Wait for Business Central route to respond with 200
   uri:
@@ -34,16 +46,30 @@
   delay: "{{ _delay }}"
   until: bizcentralresult.status == 200
 
-- name: Wait for Kie Server route to respond with 200
+- name: Wait for KieServer Case route to respond with 200
   uri:
-    url: "https://{{ kieserver_host.stdout }}/services/rest/server"
+    url: "https://{{ kieserver_case_host.stdout }}/services/rest/server"
     method: GET
     validate_certs: false
     follow_redirects: yes
     user: "{{ _namespace }}"
     password: "{{ _account_password }}"
     force_basic_auth: true
-  register: kieserverresult
+  register: kieserverresult_case
   retries: "{{ _retry }}"
   delay: "{{ _delay }}"
-  until: kieserverresult.status == 200
+  until: kieserverresult_case.status == 200
+
+- name: Wait for KieServer DMN route to respond with 200
+  uri:
+    url: "https://{{ kieserver_dmn_host.stdout }}/services/rest/server"
+    method: GET
+    validate_certs: false
+    follow_redirects: yes
+    user: "{{ _namespace }}"
+    password: "{{ _account_password }}"
+    force_basic_auth: true
+  register: kieserverresult_dmn
+  retries: "{{ _retry }}"
+  delay: "{{ _delay }}"
+  until: kieserverresult_dmn.status == 200
